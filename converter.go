@@ -71,39 +71,19 @@ func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
 	fmt.Printf("First Directory Sector: %d\n", ole.header.FirstDirSector)
 	fmt.Printf("Mini Stream Cutoff: %d bytes\n", ole.header.MiniStreamCutoff)
 
-	// Parse the FAT (File Allocation Table)
-	fmt.Printf("FAT Size: %d entries\n", len(ole.fat))
-
-	// Print the sectors
-	for i, sector := range ole.sectors {
-		fmt.Printf("Sector %d:\n", i)
-		for j, b := range sector {
-			fmt.Printf("%02X ", b)
-			if j%16 == 15 {
-				fmt.Println()
-			}
-		}
-		if i%16 == 15 {
-			fmt.Println()
+	// Get the workbook stream
+	workbookStream, err := ole.getStream("Workbook")
+	if err != nil {
+		workbookStream, err = ole.getStream("Book")
+		if err != nil {
+			return fmt.Errorf("error getting workbook stream: %v", err)
 		}
 	}
 
-	// Print the directory entry data
-	for _, entry := range ole.dirEntries {
-		fmt.Printf("Entry: %s\n", entry.name)
-		fmt.Printf("Type: %d\n", entry.entryType)
-		fmt.Printf("Color Flag: %d\n", entry.colorFlag)
-		fmt.Printf("Left Sibling ID: %d\n", entry.leftSibID)
-		fmt.Printf("Right Sibling ID: %d\n", entry.rightSibID)
-		fmt.Printf("Child ID: %d\n", entry.childID)
-		fmt.Printf("Class ID: %X\n", entry.clsid)
-		fmt.Printf("State Bits: %d\n", entry.stateBits)
-		fmt.Printf("Create Time: %d\n", entry.createTime)
-		fmt.Printf("Modify Time: %d\n", entry.modifyTime)
-		fmt.Printf("Start Sector: %d\n", entry.startSector)
-		fmt.Printf("Stream Size: %d\n", entry.streamSize)
-		fmt.Printf("Is Directory: %t\n", entry.isDirectory)
-		fmt.Printf("Is Root Storage: %t\n", entry.isRootStorage)
+	// Print the raw workbook stream
+	fmt.Printf("Workbook Stream:\n")
+	for _, b := range workbookStream {
+		fmt.Printf("%02X ", b)
 	}
 
 	return nil
@@ -358,9 +338,13 @@ func parseOLE2(data []byte) (*ole2, error) {
 			return nil, fmt.Errorf("error reading directory entry stream size: %v", err)
 		}
 
+		// TODO: Analyse the entry type
+		// Print the entry type
+		fmt.Printf("Type: %d\n", entry.entryType)
+
 		// Set flags based on the entry type
 		entry.isDirectory = entry.entryType == 1
-		entry.isRootStorage = entry.entryType == 5
+		entry.isRootStorage = entry.name == "Root Entry"
 
 		// Add the entry to the list
 		ole.dirEntries = append(ole.dirEntries, entry)

@@ -109,6 +109,59 @@ type ole2 struct {
 	miniSectors    [][]byte
 }
 
+// BIFF Workbook structure
+type biffWorkbook struct {
+	sheets  []biffSheet
+	sst     []string       // Shared String Table
+	formats map[int]string // Number formats
+	xfs     []biffXF       // Cell formats
+}
+
+// BIFF Worksheet structure
+type biffSheet struct {
+	name       string
+	rows       map[uint16]biffRow
+	dimensions biffDimensions
+}
+
+// BIFF Row structure
+type biffRow struct {
+	rowIndex uint16
+	cells    []biffCell
+}
+
+// BIFF Cell structure
+type biffCell struct {
+	row      uint16
+	col      uint16
+	cellType string // "s"=string, "n"=number, "b"=boolean, "f"=formula, "e"=error
+	strVal   string
+	numVal   float64
+	boolVal  bool
+	formula  string
+	xfIndex  uint16
+}
+
+// BIFF Dimensions structure
+type biffDimensions struct {
+	firstRow uint16
+	lastRow  uint16
+	firstCol uint16
+	lastCol  uint16
+}
+
+// BIFF XF (Cell format) structure
+type biffXF struct {
+	fontIndex      uint16
+	formatIndex    uint16
+	cellProtection uint16
+	alignment      byte
+	rotation       byte
+	borders        [4]byte
+	colors         [4]byte
+	backgroundFill byte
+}
+
 func main() {
 	xls := XLSReader{}
 

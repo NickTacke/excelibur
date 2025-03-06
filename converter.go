@@ -57,31 +57,45 @@ func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
 		return fmt.Errorf("error parsing OLE2 file: %v", err)
 	}
 
-	fmt.Println(ole)
+	// Print the ole2 headers
+	fmt.Println("XLS File Information:")
+	fmt.Println("---------------------")
+	fmt.Printf("File Signature: %X\n", ole.header.Signature)
+	fmt.Printf("Minor Version: %d\n", ole.header.MinorVersion)
+	fmt.Printf("Major Version: %d\n", ole.header.DllVersion)
+	fmt.Printf("Byte Order: 0x%04X\n", ole.header.ByteOrder)
+	fmt.Printf("Sector Size: %d bytes (2^%d)\n", 1<<ole.header.SectorShift, ole.header.SectorShift)
+	fmt.Printf("Mini Sector Size: %d bytes (2^%d)\n", 1<<ole.header.MiniSectorShift, ole.header.MiniSectorShift)
+	fmt.Printf("Number of FAT Sectors: %d\n", ole.header.NumFATSectors)
+	fmt.Printf("First Directory Sector: %d\n", ole.header.FirstDirSector)
+	fmt.Printf("Mini Stream Cutoff: %d bytes\n", ole.header.MiniStreamCutoff)
+
+	// Parse the FAT (File Allocation Table)
+	fmt.Printf("FAT Size: %d entries\n", len(ole.fat))
 
 	return nil
 }
 
 // OLE2 Header structure
-type ole2Header struct {
-	signature        [8]byte
-	clsid            [16]byte
-	minorVersion     uint16
-	majorVersion     uint16
-	byteOrder        uint16
-	sectorShift      uint16
-	miniSectorShift  uint16
-	reserved         [6]byte
-	numDirSectors    uint32
-	numFatSectors    uint32
-	firstDirSector   uint32
-	transactionSig   uint32
-	miniStreamCutoff uint32
-	firstMiniFatSec  uint32
-	numMiniFatSecs   uint32
-	firstDifatSec    uint32
-	numDifatSecs     uint32
-	difat            [109]uint32
+type Ole2Header struct {
+	Signature        [8]byte     // Should be D0 CF 11 E0 A1 B1 1A E1
+	CLSID            [16]byte    // Class ID (usually all zeros)
+	MinorVersion     uint16      // Minor version of the format
+	DllVersion       uint16      // Major version of the format
+	ByteOrder        uint16      // Byte order (0xFFFE for little-endian)
+	SectorShift      uint16      // Power of 2, sector size is 2^SectorShift (usually 9, for 512 bytes)
+	MiniSectorShift  uint16      // Power of 2, mini-sector size is 2^MiniSectorShift (usually 6, for 64 bytes)
+	Reserved1        [6]byte     // Reserved, must be zero
+	NumDirSectors    uint32      // Number of directory sectors (usually 0 for < 4 MB files)
+	NumFATSectors    uint32      // Number of FAT sectors
+	FirstDirSector   uint32      // First directory sector location
+	TransactionSig   uint32      // Transaction signature number
+	MiniStreamCutoff uint32      // Maximum size for mini-stream (usually 4096 bytes)
+	FirstMiniFATSec  uint32      // First mini-FAT sector location
+	NumMiniFATSecs   uint32      // Number of mini-FAT sectors
+	FirstDIFATSec    uint32      // First DIFAT sector location
+	NumDIFATSecs     uint32      // Number of DIFAT sectors
+	DIFAT            [109]uint32 // First 109 DIFAT entries
 }
 
 // Directory entry structure
@@ -105,7 +119,7 @@ type dirEntry struct {
 
 // OLE2 structure
 type ole2 struct {
-	header         ole2Header
+	header         Ole2Header
 	sectorSize     int
 	miniSectorSize int
 	dirEntries     []dirEntry
@@ -178,7 +192,7 @@ func parseOLE2(data []byte) (*ole2, error) {
 	ole := &ole2{}
 
 	// Parse the OLE2 header
-	header := ole2Header{}
+	header := Ole2Header{}
 	reader := bytes.NewReader(data)
 	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
 		return nil, fmt.Errorf("error reading OLE2 header: %v", err)
@@ -186,25 +200,25 @@ func parseOLE2(data []byte) (*ole2, error) {
 	ole.header = header
 
 	// Validate the OLE2 header
-	if !bytes.Equal(header.signature[:], []byte(OLE2_SIGNATURE)) {
+	if !bytes.Equal(header.Signature[:], []byte(OLE2_SIGNATURE)) {
 		return nil, errors.New("invalid OLE2 signature")
 	}
 
 	// Determine the sector size and mini sector size
-	ole.sectorSize = int(1 << header.sectorShift)
-	ole.miniSectorSize = int(1 << header.miniSectorShift)
+	ole.sectorSize = int(1 << header.SectorShift)
+	ole.miniSectorSize = int(1 << header.MiniSectorShift)
 
 	// Read FAT sectors
-	ole.fat = make([]uint32, 0, header.numFatSectors*uint32(ole.sectorSize/4))
+	ole.fat = make([]uint32, 0, header.NumFATSectors*uint32(ole.sectorSize/4))
 
 	for i := 0; i < 109; i++ {
 		// If the FAT entry is whitespace, skip it
-		if header.difat[i] == 0xFFFFFFFF {
+		if header.DIFAT[i] == 0xFFFFFFFF {
 			continue
 		}
 
 		// Read the FAT entry
-		sectorData := getSector(data, int(header.difat[i]), ole.sectorSize)
+		sectorData := getSector(data, int(header.DIFAT[i]), ole.sectorSize)
 		fatEntries := make([]uint32, ole.sectorSize/4)
 
 		if err := binary.Read(bytes.NewReader(sectorData), binary.LittleEndian, &fatEntries); err != nil {
@@ -227,8 +241,8 @@ func getSector(data []byte, sectorId int, sectorSize int) []byte {
 }
 
 func main() {
+	// Convert the sample file
 	xls := XLSReader{}
-
 	err := xls.ConvertFile("./sample.xls", "./sample.xlsx")
 	if err != nil {
 		fmt.Println(err)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
@@ -51,7 +52,12 @@ func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
 		return errors.New("not a valid XLS file (OLE2 signature not found)")
 	}
 
-	fmt.Print(data)
+	ole, err := parseOLE2(data)
+	if err != nil {
+		return fmt.Errorf("error parsing OLE2 file: %v", err)
+	}
+
+	fmt.Println(ole)
 
 	return nil
 }
@@ -160,6 +166,64 @@ type biffXF struct {
 	borders        [4]byte
 	colors         [4]byte
 	backgroundFill byte
+}
+
+func parseOLE2(data []byte) (*ole2, error) {
+	// Check if the file is big enough to contain an OLE2 header
+	if len(data) < int(SECTOR_SIZE) {
+		return nil, errors.New("not a valid XLS file (file too small)")
+	}
+
+	// Create a new OLE2 structure
+	ole := &ole2{}
+
+	// Parse the OLE2 header
+	header := ole2Header{}
+	reader := bytes.NewReader(data)
+	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
+		return nil, fmt.Errorf("error reading OLE2 header: %v", err)
+	}
+	ole.header = header
+
+	// Validate the OLE2 header
+	if !bytes.Equal(header.signature[:], []byte(OLE2_SIGNATURE)) {
+		return nil, errors.New("invalid OLE2 signature")
+	}
+
+	// Determine the sector size and mini sector size
+	ole.sectorSize = int(1 << header.sectorShift)
+	ole.miniSectorSize = int(1 << header.miniSectorShift)
+
+	// Read FAT sectors
+	ole.fat = make([]uint32, 0, header.numFatSectors*uint32(ole.sectorSize/4))
+
+	for i := 0; i < 109; i++ {
+		// If the FAT entry is whitespace, skip it
+		if header.difat[i] == 0xFFFFFFFF {
+			continue
+		}
+
+		// Read the FAT entry
+		sectorData := getSector(data, int(header.difat[i]), ole.sectorSize)
+		fatEntries := make([]uint32, ole.sectorSize/4)
+
+		if err := binary.Read(bytes.NewReader(sectorData), binary.LittleEndian, &fatEntries); err != nil {
+			return nil, fmt.Errorf("error reading FAT sector: %v", err)
+		}
+		ole.fat = append(ole.fat, fatEntries...)
+	}
+
+	return ole, nil
+}
+
+// Get a sector from the OLE2 file
+func getSector(data []byte, sectorId int, sectorSize int) []byte {
+	offset := 512 + sectorId*sectorSize
+	end := offset + sectorSize
+	if end > len(data) {
+		end = len(data)
+	}
+	return data[offset:end]
 }
 
 func main() {

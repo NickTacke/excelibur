@@ -260,6 +260,28 @@ func getSector(data []byte, sectorId int, sectorSize int) []byte {
 	return data[offset:end]
 }
 
+// Read a chain of sectors from the FAT
+func readChain(fat []uint32, startSector int) []int {
+	if startSector < 0 || startSector >= len(fat) || startSector == 0xFFFFFFFE {
+		return []int{}
+	}
+
+	chain := []int{startSector}
+	nextSector := int(fat[startSector])
+
+	// Loop over the sectors
+	for nextSector != 0xFFFFFFFE {
+		if nextSector < 0 || nextSector >= len(fat) {
+			break
+		}
+
+		chain = append(chain, nextSector)
+		nextSector = int(fat[nextSector])
+	}
+
+	return chain
+}
+
 func main() {
 	// Convert the sample file
 	xls := XLSReader{}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 )
 
 const (
@@ -451,6 +452,46 @@ func readChain(fat []uint32, startSector int) []int {
 	}
 
 	return chain
+}
+
+// Get the stream data from an OLE2 structure
+func (ole *ole2) getStream(name string) ([]byte, error) {
+	// Find the directory entry with the given name
+	var streamEntry *dirEntry
+	for i := range ole.dirEntries {
+		if strings.EqualFold(ole.dirEntries[i].name, name) {
+			streamEntry = &ole.dirEntries[i]
+			break
+		}
+	}
+	if streamEntry == nil {
+		return nil, fmt.Errorf("stream not found: %s", name)
+	}
+
+	// Check if this is a mini stream or a regular stream
+	if streamEntry.streamSize < uint64(ole.header.MiniStreamCutoff) {
+		// Read from the mini stream
+		miniChain := readChain(ole.miniFat, int(streamEntry.startSector))
+		data := make([]byte, 0, streamEntry.streamSize)
+		for _, sectorId := range miniChain {
+			if sectorId >= len(ole.miniSectors) {
+				return nil, fmt.Errorf("invalid mini sector ID: %d", sectorId)
+			}
+			data = append(data, ole.miniSectors[sectorId]...)
+		}
+		return data[:streamEntry.streamSize], nil
+	} else {
+		// Read from the regular stream
+		chain := readChain(ole.fat, int(streamEntry.startSector))
+		data := make([]byte, 0, streamEntry.streamSize)
+		for _, sectorId := range chain {
+			if sectorId >= len(ole.sectors) {
+				return nil, fmt.Errorf("invalid sector ID: %d", sectorId)
+			}
+			data = append(data, ole.sectors[sectorId]...)
+		}
+		return data[:streamEntry.streamSize], nil
+	}
 }
 
 func main() {

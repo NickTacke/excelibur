@@ -87,6 +87,11 @@ func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
 		}
 	}
 
+	// Print the directory entry names
+	for _, entry := range ole.dirEntries {
+		fmt.Printf("%s\n", entry.name)
+	}
+
 	return nil
 }
 
@@ -245,6 +250,51 @@ func parseOLE2(data []byte) (*ole2, error) {
 	ole.sectors = make([][]byte, numSectors)
 	for i := 0; i < numSectors; i++ {
 		ole.sectors[i] = getSector(data, i, ole.sectorSize)
+	}
+
+	// Read directory entries
+	dirSectors := readChain(ole.fat, int(header.FirstDirSector))
+	dirData := make([]byte, 0, len(dirSectors)*ole.sectorSize)
+	for _, sectorId := range dirSectors {
+		if int(sectorId) >= len(ole.sectors) {
+			return nil, fmt.Errorf("invalid directory sector ID in directory chain: %d", sectorId)
+		}
+		dirData = append(dirData, ole.sectors[sectorId]...)
+	}
+
+	// Parse the directory entries
+	for i := 0; i < len(dirData); i += 128 {
+		// Check if the directory is valid
+		if i+128 > len(dirData) {
+			break
+		}
+
+		// Read the directory entry
+		entry := dirEntry{}
+		entryReader := bytes.NewReader(dirData[i : i+128])
+
+		// Read the entry name
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.nameRaw); err != nil {
+			return nil, fmt.Errorf("error reading directory entry name: %v", err)
+		}
+
+		// Convert the name to a string
+		nameBuffer := bytes.NewBuffer(nil)
+		for j := 0; j < 32; j++ {
+			wchar := binary.LittleEndian.Uint16(entry.nameRaw[j*2 : j*2+2])
+			if wchar == 0 {
+				break
+			}
+			nameBuffer.WriteRune(rune(wchar))
+		}
+		entry.name = nameBuffer.String()
+
+		// Set flags based on the entry type
+		entry.isDirectory = entry.entryType == 1
+		entry.isRootStorage = entry.entryType == 5
+
+		// Add the entry to the list
+		ole.dirEntries = append(ole.dirEntries, entry)
 	}
 
 	return ole, nil

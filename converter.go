@@ -365,6 +365,35 @@ func parseOLE2(data []byte) (*ole2, error) {
 		ole.dirEntries = append(ole.dirEntries, entry)
 	}
 
+	// Find the root storage entry
+	var rootStorage *dirEntry
+	for i := range ole.dirEntries {
+		if ole.dirEntries[i].isRootStorage {
+			rootStorage = &ole.dirEntries[i]
+			break
+		}
+	}
+
+	// Check if the root storage entry exists
+	if rootStorage == nil {
+		return nil, errors.New("root storage not found")
+	}
+
+	// Read the Mini FAT if it exists
+	if header.NumMiniFATSecs > 0 {
+		miniFatChain := readChain(ole.fat, int(header.FirstMiniFATSec))
+		miniFatData := make([]byte, 0, len(miniFatChain)*ole.sectorSize)
+		for _, sectorId := range miniFatChain {
+			miniFatData = append(miniFatData, ole.sectors[sectorId]...)
+		}
+
+		// Parse the Mini FAT
+		ole.miniFat = make([]uint32, len(miniFatData)/4)
+		if err := binary.Read(bytes.NewReader(miniFatData), binary.LittleEndian, &ole.miniFat); err != nil {
+			return nil, fmt.Errorf("error reading Mini FAT: %v", err)
+		}
+	}
+
 	return ole, nil
 }
 

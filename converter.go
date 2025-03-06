@@ -56,6 +56,59 @@ func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
 	return nil
 }
 
+// OLE2 Header structure
+type ole2Header struct {
+	signature        [8]byte
+	clsid            [16]byte
+	minorVersion     uint16
+	majorVersion     uint16
+	byteOrder        uint16
+	sectorShift      uint16
+	miniSectorShift  uint16
+	reserved         [6]byte
+	numDirSectors    uint32
+	numFatSectors    uint32
+	firstDirSector   uint32
+	transactionSig   uint32
+	miniStreamCutoff uint32
+	firstMiniFatSec  uint32
+	numMiniFatSecs   uint32
+	firstDifatSec    uint32
+	numDifatSecs     uint32
+	difat            [109]uint32
+}
+
+// Directory entry structure
+type dirEntry struct {
+	name          string
+	nameRaw       [64]byte
+	entryType     byte
+	colorFlag     byte
+	leftSibID     uint32
+	rightSibID    uint32
+	childID       uint32
+	clsid         [16]byte
+	stateBits     uint32
+	createTime    uint64
+	modifyTime    uint64
+	startSector   uint32
+	streamSize    uint64
+	isDirectory   bool
+	isRootStorage bool
+}
+
+// OLE2 structure
+type ole2 struct {
+	header         ole2Header
+	sectorSize     int
+	miniSectorSize int
+	dirEntries     []dirEntry
+	fat            []uint32
+	miniFat        []uint32
+	sectors        [][]byte
+	miniSectors    [][]byte
+}
+
 func main() {
 	xls := XLSReader{}
 

@@ -1,6 +1,11 @@
 package excelibur
 
-import "fmt"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"os"
+)
 
 const (
 	// Signatures
@@ -34,6 +39,19 @@ type XLSReader struct {
 	Debug        bool
 }
 
-func (xls *XLSReader) ConvertFile(xlsFile string, xlsxOut string) error {
-	return fmt.Errorf("not implemented")
+func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
+	// Read the entire file into memory
+	data, err := os.ReadFile(xlsIn)
+	if err != nil {
+		return err
+	}
+
+	// Check if it's an OLE2 file
+	if !bytes.HasPrefix(data, []byte(OLE2_SIGNATURE)) {
+		return errors.New("not a valid XLS file (OLE2 signature not found)")
+	}
+
+	fmt.Print(data)
+
+	return nil
 }

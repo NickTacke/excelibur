@@ -1,4 +1,4 @@
-package excelibur
+package main
 
 import (
 	"bytes"
@@ -54,4 +54,13 @@ func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
 	fmt.Print(data)
 
 	return nil
+}
+
+func main() {
+	xls := XLSReader{}
+
+	err := xls.ConvertFile("./test.xls", "./test.xlsx")
+	if err != nil {
+		fmt.Println(err)
+	}
 }

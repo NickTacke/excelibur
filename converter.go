@@ -87,9 +87,22 @@ func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
 		}
 	}
 
-	// Print the directory entry names
+	// Print the directory entry data
 	for _, entry := range ole.dirEntries {
-		fmt.Printf("%s\n", entry.name)
+		fmt.Printf("Entry: %s\n", entry.name)
+		fmt.Printf("Type: %d\n", entry.entryType)
+		fmt.Printf("Color Flag: %d\n", entry.colorFlag)
+		fmt.Printf("Left Sibling ID: %d\n", entry.leftSibID)
+		fmt.Printf("Right Sibling ID: %d\n", entry.rightSibID)
+		fmt.Printf("Child ID: %d\n", entry.childID)
+		fmt.Printf("Class ID: %X\n", entry.clsid)
+		fmt.Printf("State Bits: %d\n", entry.stateBits)
+		fmt.Printf("Create Time: %d\n", entry.createTime)
+		fmt.Printf("Modify Time: %d\n", entry.modifyTime)
+		fmt.Printf("Start Sector: %d\n", entry.startSector)
+		fmt.Printf("Stream Size: %d\n", entry.streamSize)
+		fmt.Printf("Is Directory: %t\n", entry.isDirectory)
+		fmt.Printf("Is Root Storage: %t\n", entry.isRootStorage)
 	}
 
 	return nil
@@ -288,6 +301,61 @@ func parseOLE2(data []byte) (*ole2, error) {
 			nameBuffer.WriteRune(rune(wchar))
 		}
 		entry.name = nameBuffer.String()
+
+		// Read the entry type
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.entryType); err != nil {
+			return nil, fmt.Errorf("error reading directory entry type: %v", err)
+		}
+
+		// Read the entry color flag
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.colorFlag); err != nil {
+			return nil, fmt.Errorf("error reading directory entry color flag: %v", err)
+		}
+
+		// Read the entry left sibling ID
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.leftSibID); err != nil {
+			return nil, fmt.Errorf("error reading directory entry left sibling ID: %v", err)
+		}
+
+		// Read the entry right sibling ID
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.rightSibID); err != nil {
+			return nil, fmt.Errorf("error reading directory entry right sibling ID: %v", err)
+		}
+
+		// Read the entry child ID
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.childID); err != nil {
+			return nil, fmt.Errorf("error reading directory entry child ID: %v", err)
+		}
+
+		// Read the entry class ID
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.clsid); err != nil {
+			return nil, fmt.Errorf("error reading directory entry class ID: %v", err)
+		}
+
+		// Read the entry state bits
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.stateBits); err != nil {
+			return nil, fmt.Errorf("error reading directory entry state bits: %v", err)
+		}
+
+		// Read the entry create time
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.createTime); err != nil {
+			return nil, fmt.Errorf("error reading directory entry create time: %v", err)
+		}
+
+		// Read the entry modify time
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.modifyTime); err != nil {
+			return nil, fmt.Errorf("error reading directory entry modify time: %v", err)
+		}
+
+		// Read the entry start sector
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.startSector); err != nil {
+			return nil, fmt.Errorf("error reading directory entry start sector: %v", err)
+		}
+
+		// Read the entry stream size
+		if err := binary.Read(entryReader, binary.LittleEndian, &entry.streamSize); err != nil {
+			return nil, fmt.Errorf("error reading directory entry stream size: %v", err)
+		}
 
 		// Set flags based on the entry type
 		entry.isDirectory = entry.entryType == 1

@@ -59,7 +59,7 @@ func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
 func main() {
 	xls := XLSReader{}
 
-	err := xls.ConvertFile("./test.xls", "./test.xlsx")
+	err := xls.ConvertFile("./sample.xls", "./sample.xlsx")
 	if err != nil {
 		fmt.Println(err)
 	}

@@ -394,6 +394,30 @@ func parseOLE2(data []byte) (*ole2, error) {
 		}
 	}
 
+	// Read the mini stream
+	miniStreamChain := readChain(ole.fat, int(rootStorage.startSector))
+	miniStreamData := make([]byte, 0, len(miniStreamChain)*ole.sectorSize)
+	for _, sectorId := range miniStreamChain {
+		miniStreamData = append(miniStreamData, ole.sectors[sectorId]...)
+	}
+
+	// Truncate the mini stream to the mini stream cutoff
+	if int(rootStorage.streamSize) < len(miniStreamData) {
+		miniStreamData = miniStreamData[:int(rootStorage.streamSize)]
+	}
+
+	// Parse mini sectors
+	numMiniSectors := len(miniStreamData) / ole.miniSectorSize
+	ole.miniSectors = make([][]byte, numMiniSectors)
+	for i := 0; i < numMiniSectors; i++ {
+		start := i * ole.miniSectorSize
+		end := start + ole.miniSectorSize
+		if end > len(miniStreamData) {
+			end = len(miniStreamData)
+		}
+		ole.miniSectors[i] = miniStreamData[start:end]
+	}
+
 	return ole, nil
 }
 

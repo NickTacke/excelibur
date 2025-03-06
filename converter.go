@@ -73,6 +73,20 @@ func (xls *XLSReader) ConvertFile(xlsIn string, xlsxOut string) error {
 	// Parse the FAT (File Allocation Table)
 	fmt.Printf("FAT Size: %d entries\n", len(ole.fat))
 
+	// Print the sectors
+	for i, sector := range ole.sectors {
+		fmt.Printf("Sector %d:\n", i)
+		for j, b := range sector {
+			fmt.Printf("%02X ", b)
+			if j%16 == 15 {
+				fmt.Println()
+			}
+		}
+		if i%16 == 15 {
+			fmt.Println()
+		}
+	}
+
 	return nil
 }
 
@@ -210,7 +224,6 @@ func parseOLE2(data []byte) (*ole2, error) {
 
 	// Read FAT sectors
 	ole.fat = make([]uint32, 0, header.NumFATSectors*uint32(ole.sectorSize/4))
-
 	for i := 0; i < 109; i++ {
 		// If the FAT entry is whitespace, skip it
 		if header.DIFAT[i] == 0xFFFFFFFF {
@@ -225,6 +238,13 @@ func parseOLE2(data []byte) (*ole2, error) {
 			return nil, fmt.Errorf("error reading FAT sector: %v", err)
 		}
 		ole.fat = append(ole.fat, fatEntries...)
+	}
+
+	// Parse sectors
+	numSectors := (len(data) - 512) / ole.sectorSize
+	ole.sectors = make([][]byte, numSectors)
+	for i := 0; i < numSectors; i++ {
+		ole.sectors[i] = getSector(data, i, ole.sectorSize)
 	}
 
 	return ole, nil
